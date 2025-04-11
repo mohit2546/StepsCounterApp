@@ -23,6 +23,7 @@ export const StepCounter: React.FC = () => {
   const fetchData = async () => {
     try {
       const todayData = await HealthKit.getTodayData();
+      console.log('todayData', todayData);
       setSteps(todayData.steps);
       setDistance(todayData.distance);
       setCalories(todayData.calories);
