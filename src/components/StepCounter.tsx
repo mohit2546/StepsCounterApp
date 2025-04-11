@@ -1,12 +1,26 @@
 import React, {useEffect, useState, useCallback} from 'react';
-import {View, Text, StyleSheet, TouchableOpacity} from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Dimensions,
+} from 'react-native';
 import {HealthKit} from '../native/HealthKit';
+import {TotalsView} from './TotalsView';
+
+const CIRCLE_SIZE = Dimensions.get('window').width * 0.7;
+
+type TabView = 'day' | 'totals' | 'settings';
 
 export const StepCounter: React.FC = () => {
   const [steps, setSteps] = useState<number>(0);
+  const [stepsGoal, setStepsGoal] = useState<number>(5000);
   const [distance, setDistance] = useState<number>(0);
   const [calories, setCalories] = useState<number>(0);
-  const [isAuthorized, setIsAuthorized] = useState<boolean>(false);
+  const [duration, setDuration] = useState<number>(0);
+  const [_isAuthorized, setIsAuthorized] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<TabView>('day');
 
   const checkAuthorization = useCallback(async () => {
     try {
@@ -23,10 +37,11 @@ export const StepCounter: React.FC = () => {
   const fetchData = async () => {
     try {
       const todayData = await HealthKit.getTodayData();
-      console.log('todayData', todayData);
-      setSteps(todayData.steps);
-      setDistance(todayData.distance);
-      setCalories(todayData.calories);
+      setSteps(todayData.steps || 0);
+      setStepsGoal(todayData.stepsGoal || 5000);
+      setDistance(todayData.distance || 0);
+      setCalories(todayData.calories || 0);
+      setDuration(todayData.duration || 0);
     } catch (error) {
       console.error('Error fetching data:', error);
     }
@@ -36,38 +51,108 @@ export const StepCounter: React.FC = () => {
     checkAuthorization();
   }, [checkAuthorization]);
 
-  const formatDistance = (meters: number) => {
-    if (meters >= 1000) {
-      return `${(meters / 1000).toFixed(2)} km`;
+  const calculateProgress = () => {
+    const progress = steps / stepsGoal;
+    return Math.min(progress, 1);
+  };
+
+  const renderDayView = () => {
+    const progress = calculateProgress();
+
+    return (
+      <>
+        <View style={styles.progressContainer}>
+          <Text style={styles.stepsTitle}>STEPS</Text>
+          <View style={styles.circleContainer}>
+            <View style={styles.circleBackground} />
+            <View style={styles.svgContainer}>
+              <View
+                style={[
+                  styles.progressCircle,
+                  {
+                    borderWidth: 15,
+                    borderColor: '#E5FF44',
+                    transform: [{rotate: `${-90 + progress * 360}deg`}],
+                  },
+                ]}
+              />
+            </View>
+            <View style={styles.stepsContainer}>
+              <Text style={styles.stepsCount}>{steps.toLocaleString()}</Text>
+              <Text style={styles.stepsGoal}>
+                GOAL {stepsGoal.toLocaleString()}
+              </Text>
+            </View>
+          </View>
+        </View>
+        <View style={styles.bottomStats}>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{calories.toFixed(0)}</Text>
+            <Text style={styles.statLabel}>kcal</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{(distance / 1000).toFixed(3)}</Text>
+            <Text style={styles.statLabel}>km</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{duration.toFixed(0)}</Text>
+            <Text style={styles.statLabel}>min</Text>
+          </View>
+        </View>
+      </>
+    );
+  };
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'totals':
+        return <TotalsView />;
+      case 'settings':
+        return (
+          <View style={styles.centeredContainer}>
+            <Text style={styles.comingSoonText}>Coming Soon</Text>
+          </View>
+        );
+      default:
+        return renderDayView();
     }
-    return `${meters.toFixed(0)} m`;
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Step Counter</Text>
-      <View style={styles.statsContainer}>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{steps.toLocaleString()}</Text>
-          <Text style={styles.statLabel}>Steps</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{formatDistance(distance)}</Text>
-          <Text style={styles.statLabel}>Distance</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{calories.toLocaleString()}</Text>
-          <Text style={styles.statLabel}>Calories</Text>
-        </View>
-      </View>
-      {!isAuthorized && (
-        <TouchableOpacity style={styles.button} onPress={checkAuthorization}>
-          <Text style={styles.buttonText}>Authorize HealthKit</Text>
+      {renderContent()}
+      <View style={styles.tabBar}>
+        <TouchableOpacity
+          style={styles.tabButton}
+          onPress={() => setActiveTab('day')}>
+          <Text
+            style={[styles.tabText, activeTab === 'day' && styles.activeTab]}>
+            day
+          </Text>
         </TouchableOpacity>
-      )}
-      <TouchableOpacity style={styles.button} onPress={fetchData}>
-        <Text style={styles.buttonText}>Refresh Data</Text>
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.tabButton}
+          onPress={() => setActiveTab('totals')}>
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'totals' && styles.activeTab,
+            ]}>
+            totals
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.tabButton}
+          onPress={() => setActiveTab('settings')}>
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'settings' && styles.activeTab,
+            ]}>
+            settings
+          </Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
@@ -75,59 +160,99 @@ export const StepCounter: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#2B2F3E',
+    justifyContent: 'space-between',
+  },
+  centeredContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#f5f5f5',
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
+  comingSoonText: {
+    fontSize: 24,
+    color: '#8E8E93',
+  },
+  progressContainer: {
+    alignItems: 'center',
+    marginTop: 50,
+  },
+  stepsTitle: {
+    fontSize: 24,
+    color: '#E5FF44',
     marginBottom: 30,
-    color: '#333',
+    fontWeight: '600',
   },
-  statsContainer: {
+  circleContainer: {
+    width: CIRCLE_SIZE,
+    height: CIRCLE_SIZE,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  circleBackground: {
+    position: 'absolute',
+    width: CIRCLE_SIZE,
+    height: CIRCLE_SIZE,
+    borderRadius: CIRCLE_SIZE / 2,
+    borderWidth: 15,
+    borderColor: '#3E4356',
+  },
+  svgContainer: {
+    width: CIRCLE_SIZE,
+    height: CIRCLE_SIZE,
+    position: 'absolute',
+  },
+  progressCircle: {
+    width: CIRCLE_SIZE,
+    height: CIRCLE_SIZE,
+    borderRadius: CIRCLE_SIZE / 2,
+  },
+  stepsContainer: {
+    alignItems: 'center',
+  },
+  stepsCount: {
+    fontSize: 48,
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+  },
+  stepsGoal: {
+    fontSize: 16,
+    color: '#8E8E93',
+    marginTop: 5,
+  },
+  bottomStats: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    width: '100%',
-    marginBottom: 30,
+    paddingHorizontal: 20,
+    marginBottom: 20,
   },
   statItem: {
     alignItems: 'center',
-    backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 15,
-    width: '30%',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
   },
   statValue: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#007AFF',
-    marginBottom: 5,
+    color: '#E5FF44',
+    fontWeight: '500',
   },
   statLabel: {
     fontSize: 14,
-    color: '#666',
+    color: '#8E8E93',
+    marginTop: 5,
   },
-  button: {
-    backgroundColor: '#007AFF',
-    padding: 15,
-    borderRadius: 10,
-    marginVertical: 10,
-    width: '100%',
-    alignItems: 'center',
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: '#1C1D26',
+    padding: 10,
+    justifyContent: 'space-around',
   },
-  buttonText: {
-    color: 'white',
+  tabButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+  },
+  tabText: {
+    color: '#8E8E93',
     fontSize: 16,
-    fontWeight: 'bold',
+  },
+  activeTab: {
+    color: '#E5FF44',
   },
 });

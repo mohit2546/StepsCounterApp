@@ -15,8 +15,9 @@ class HealthKitManager: NSObject {
     let stepCount = HKObjectType.quantityType(forIdentifier: .stepCount)!
     let distance = HKObjectType.quantityType(forIdentifier: .distanceWalkingRunning)!
     let activeEnergy = HKObjectType.quantityType(forIdentifier: .activeEnergyBurned)!
+    let appleExerciseTime = HKObjectType.quantityType(forIdentifier: .appleExerciseTime)!
     
-    healthStore.requestAuthorization(toShare: [], read: [stepCount, distance, activeEnergy]) { success, error in
+    healthStore.requestAuthorization(toShare: [], read: [stepCount, distance, activeEnergy, appleExerciseTime]) { success, error in
       if let error = error {
         reject("ERROR", "Failed to request authorization: \(error.localizedDescription)", error)
         return
@@ -74,6 +75,8 @@ class HealthKitManager: NSObject {
             value = sum.doubleValue(for: HKUnit.meter())
           case .activeEnergyBurned:
             value = sum.doubleValue(for: HKUnit.kilocalorie())
+          case .appleExerciseTime:
+            value = sum.doubleValue(for: HKUnit.minute())
           default:
             value = 0
           }
@@ -156,11 +159,32 @@ class HealthKitManager: NSObject {
         group.leave()
       }
     )
+
+    // Exercise Time
+    group.enter()
+    getDataForPeriod(
+      type: .appleExerciseTime,
+      startDate: startOfDay,
+      endDate: now,
+      interval: DateComponents(day: 1),
+      resolve: { data in
+        if let data = data as? [[String: Any]], let first = data.first {
+          result["duration"] = first["value"]
+        }
+        group.leave()
+      },
+      reject: { code, message, err in
+        error = err
+        group.leave()
+      }
+    )
     
     group.notify(queue: .main) {
       if let error = error {
         reject("ERROR", "Failed to fetch data: \(error.localizedDescription)", error)
       } else {
+        // Add default goal
+        result["stepsGoal"] = 5000
         resolve(result)
       }
     }
@@ -184,6 +208,12 @@ class HealthKitManager: NSObject {
       interval: DateComponents(day: 1),
       resolve: { data in
         result["steps"] = data
+        if let data = data as? [[String: Any]] {
+          let values = data.compactMap { $0["value"] as? Double }
+          let total = values.reduce(0, +)
+          result["stepsTotal"] = total
+          result["stepsAverage"] = values.isEmpty ? 0 : total / Double(values.count)
+        }
         group.leave()
       },
       reject: { code, message, err in
@@ -201,6 +231,12 @@ class HealthKitManager: NSObject {
       interval: DateComponents(day: 1),
       resolve: { data in
         result["distance"] = data
+        if let data = data as? [[String: Any]] {
+          let values = data.compactMap { $0["value"] as? Double }
+          let total = values.reduce(0, +)
+          result["distanceTotal"] = total
+          result["distanceAverage"] = values.isEmpty ? 0 : total / Double(values.count)
+        }
         group.leave()
       },
       reject: { code, message, err in
@@ -218,6 +254,35 @@ class HealthKitManager: NSObject {
       interval: DateComponents(day: 1),
       resolve: { data in
         result["calories"] = data
+        if let data = data as? [[String: Any]] {
+          let values = data.compactMap { $0["value"] as? Double }
+          let total = values.reduce(0, +)
+          result["caloriesTotal"] = total
+          result["caloriesAverage"] = values.isEmpty ? 0 : total / Double(values.count)
+        }
+        group.leave()
+      },
+      reject: { code, message, err in
+        error = err
+        group.leave()
+      }
+    )
+
+    // Exercise Time
+    group.enter()
+    getDataForPeriod(
+      type: .appleExerciseTime,
+      startDate: startOfWeek,
+      endDate: now,
+      interval: DateComponents(day: 1),
+      resolve: { data in
+        result["duration"] = data
+        if let data = data as? [[String: Any]] {
+          let values = data.compactMap { $0["value"] as? Double }
+          let total = values.reduce(0, +)
+          result["durationTotal"] = total
+          result["durationAverage"] = values.isEmpty ? 0 : total / Double(values.count)
+        }
         group.leave()
       },
       reject: { code, message, err in
@@ -253,6 +318,12 @@ class HealthKitManager: NSObject {
       interval: DateComponents(day: 1),
       resolve: { data in
         result["steps"] = data
+        if let data = data as? [[String: Any]] {
+          let values = data.compactMap { $0["value"] as? Double }
+          let total = values.reduce(0, +)
+          result["stepsTotal"] = total
+          result["stepsAverage"] = values.isEmpty ? 0 : total / Double(values.count)
+        }
         group.leave()
       },
       reject: { code, message, err in
@@ -270,6 +341,12 @@ class HealthKitManager: NSObject {
       interval: DateComponents(day: 1),
       resolve: { data in
         result["distance"] = data
+        if let data = data as? [[String: Any]] {
+          let values = data.compactMap { $0["value"] as? Double }
+          let total = values.reduce(0, +)
+          result["distanceTotal"] = total
+          result["distanceAverage"] = values.isEmpty ? 0 : total / Double(values.count)
+        }
         group.leave()
       },
       reject: { code, message, err in
@@ -287,6 +364,35 @@ class HealthKitManager: NSObject {
       interval: DateComponents(day: 1),
       resolve: { data in
         result["calories"] = data
+        if let data = data as? [[String: Any]] {
+          let values = data.compactMap { $0["value"] as? Double }
+          let total = values.reduce(0, +)
+          result["caloriesTotal"] = total
+          result["caloriesAverage"] = values.isEmpty ? 0 : total / Double(values.count)
+        }
+        group.leave()
+      },
+      reject: { code, message, err in
+        error = err
+        group.leave()
+      }
+    )
+
+    // Exercise Time
+    group.enter()
+    getDataForPeriod(
+      type: .appleExerciseTime,
+      startDate: startOfMonth,
+      endDate: now,
+      interval: DateComponents(day: 1),
+      resolve: { data in
+        result["duration"] = data
+        if let data = data as? [[String: Any]] {
+          let values = data.compactMap { $0["value"] as? Double }
+          let total = values.reduce(0, +)
+          result["durationTotal"] = total
+          result["durationAverage"] = values.isEmpty ? 0 : total / Double(values.count)
+        }
         group.leave()
       },
       reject: { code, message, err in
