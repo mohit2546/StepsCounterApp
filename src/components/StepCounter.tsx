@@ -7,6 +7,7 @@ import {
   Dimensions,
 } from 'react-native';
 import {HealthKit} from '../native/HealthKit';
+import {WidgetManager} from '../native/WidgetUpdater';
 import {TotalsView} from './TotalsView';
 
 const CIRCLE_SIZE = Dimensions.get('window').width * 0.7;
@@ -37,11 +38,19 @@ export const StepCounter: React.FC = () => {
   const fetchData = async () => {
     try {
       const todayData = await HealthKit.getTodayData();
+      console.log('todayyyy data', todayData);
       setSteps(todayData.steps || 0);
       setStepsGoal(todayData.stepsGoal || 5000);
       setDistance(todayData.distance || 0);
       setCalories(todayData.calories || 0);
       setDuration(todayData.duration || 0);
+
+      // Try to update widgets, but don't let failures affect the app
+      try {
+        WidgetManager.reloadStepsWidgets();
+      } catch (widgetError) {
+        console.log('Widget update failed:', widgetError);
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
     }
@@ -50,6 +59,15 @@ export const StepCounter: React.FC = () => {
   useEffect(() => {
     checkAuthorization();
   }, [checkAuthorization]);
+
+  // Add periodic updates
+  useEffect(() => {
+    const updateInterval = setInterval(() => {
+      fetchData();
+    }, 5 * 60 * 1000); // Update every 5 minutes
+
+    return () => clearInterval(updateInterval);
+  }, []);
 
   const calculateProgress = () => {
     const progress = steps / stepsGoal;
